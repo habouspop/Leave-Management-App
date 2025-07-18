@@ -6,19 +6,19 @@ export default function Dashboard() {
   const stats = [
     {
       title: "الطلبات الجديدة",
-      value: 5,
+      value: 0,
     },
     {
       title: "الطلبات الموافق عليها",
-      value: 24,
+      value: 0,
     },
     {
       title: "الطلبات المرفوضة",
-      value: 3,
+      value: 0,
     },
     {
       title: "مجموع الطلبات",
-      value: 32,
+      value: 0,
     },
   ];
 
@@ -27,7 +27,7 @@ export default function Dashboard() {
       <div className="space-y-6">
         <h2 className="text-3xl font-bold tracking-tight">مرحباً بك في نظام إدارة الإجازات</h2>
         <p className="text-muted-foreground">
-          نظام إدارة إجازات العاملين الدينيين تحت إشراف وزارة الأوقاف والشؤون الإسلامية
+          نظام إدارة إجازات القيمين الدينيين تحت إشراف وزارة الأوقاف والشؤون الإسلامية
         </p>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
