@@ -70,47 +70,8 @@ export default function History() {
         setError('حدث خطأ أثناء جلب البيانات. الرجاء المحاولة مرة أخرى.');
         
         // Fallback to mock data if there's an error
-        setRequests([
-          {
-            id: "1",
-            national_id: "A123456",
-            travel_type: "داخل الوطن",
-            start_date: "2023-07-10",
-            end_date: "2023-07-15",
-            days_count: 6,
-            reason: "زيارة عائلية",
-            status: "approved",
-            admin_notes: "موافقة",
-            created_at: "2023-06-15",
-            updated_at: "2023-06-20"
-          },
-          {
-            id: "2",
-            national_id: "B789012",
-            travel_type: "خارج الوطن",
-            start_date: "2023-08-05",
-            end_date: "2023-08-15",
-            days_count: 11,
-            reason: "سفر للعمرة",
-            status: "pending",
-            created_at: "2023-07-20",
-            updated_at: "2023-07-20"
-          },
-          {
-            id: "3",
-            national_id: "C345678",
-            travel_type: "داخل الوطن",
-            start_date: "2023-09-01",
-            end_date: "2023-09-05",
-            days_count: 5,
-            reason: "ظروف خاصة",
-            status: "rejected",
-            admin_notes: "تجاوز الحد المسموح",
-            created_at: "2023-08-15",
-            updated_at: "2023-08-18"
-          }
-        ]);
-      } finally {
+       
+       } finally {
         setLoading(false);
       }
     };
