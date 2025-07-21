@@ -59,8 +59,7 @@ export function Sidebar() {
       </nav>
 
       <div className="mt-auto pt-6 px-2 text-center text-sm text-muted-foreground">
-        وزارة الأوقاف والشؤون الإسلامية
-        <br />
+المندوبية الإقليمية للشؤون الإسلامية بالحي الحسني        <br />
         {new Date().getFullYear()} ©
       </div>
     </aside>
