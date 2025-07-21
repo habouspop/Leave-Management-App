@@ -17,7 +17,7 @@ export function MainLayout({ children, className }: MainLayoutProps) {
       {/* Main Content */}
       <div className={cn("flex-1 p-6", className)}>
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">وزارة الأوقاف والشؤون الإسلامية</h1>
+          <h1 className="text-2xl font-bold">المندوبية الإقليمية للشؤون الإسلامية بالحي الحسني</h1>
           <div className="flex items-center gap-2">
             <ModeToggle />
           </div>
