@@ -1,423 +1,288 @@
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect } from "react";
-import { LeaveRequest } from "@/lib/types";
-import { format } from "date-fns";
-import { ar } from "date-fns/locale";
-import { 
-  AlertDialog, 
-  AlertDialogAction, 
-  AlertDialogCancel, 
-  AlertDialogContent, 
-  AlertDialogDescription, 
-  AlertDialogFooter, 
-  AlertDialogHeader, 
-  AlertDialogTitle,
-  AlertDialogTrigger
-} from "@/components/ui/alert-dialog";
-import { Trash2, FileText, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { FormEvent, useState } from "react";
+import { FileText, Printer, Loader2 } from "lucide-react";
 import { supabase, TABLES } from "@/lib/supabase";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default function History() {
-  const [filter, setFilter] = useState("all");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [requestToDelete, setRequestToDelete] = useState<string | null>(null);
-  const [requestToView, setRequestToView] = useState<LeaveRequest | null>(null);
-  const [requests, setRequests] = useState<LeaveRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export default function Print() {
+  const [nationalId, setNationalId] = useState("");
+  const [error, setError] = useState("");
+  const [searchPerformed, setSearchPerformed] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [printLoading, setPrintLoading] = useState<number | null>(null);
+  const [staffName, setStaffName] = useState("");
 
-  // Fetch leave requests from Supabase
-  useEffect(() => {
-    const fetchLeaveRequests = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  // Documents available for printing
+  const documents = [
+    { id: 1, title: "شهادة عمل", description: "شهادة تثبت العمل في المؤسسة الدينية" },
+    { id: 2, title: "إشعار إجازة", description: "وثيقة رسمية تفيد الموافقة على الإجازة" },
+    { id: 3, title: "مذكرة استئناف عمل", description: "وثيقة لتأكيد العودة بعد الإجازة" },
+  ];
 
-        const { data, error } = await supabase
-          .from(TABLES.LEAVE_REQUESTS)
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          throw error;
-        }
-
-        if (data) {
-          // Transform data to match our LeaveRequest type
-          const formattedData: LeaveRequest[] = data.map(item => ({
-            id: item.id,
-            national_id: item.national_id,
-            travel_type: item.travel_type,
-            country: item.country,
-            start_date: item.start_date,
-            end_date: item.end_date,
-            days_count: item.days_count,
-            reason: item.reason,
-            status: item.status,
-            admin_notes: item.admin_notes,
-            created_at: item.created_at,
-            updated_at: item.updated_at
-          }));
-          setRequests(formattedData);
-        }
-      } catch (err) {
-        console.error('Error fetching leave requests:', err);
-        setError('حدث خطأ أثناء جلب البيانات. الرجاء المحاولة مرة أخرى.');
-        
-        // Fallback to mock data if there's an error
-        setRequests([
-          {
-            id: "1",
-            national_id: "A123456",
-            travel_type: "داخل الوطن",
-            start_date: "2023-07-10",
-            end_date: "2023-07-15",
-            days_count: 6,
-            reason: "زيارة عائلية",
-            status: "approved",
-            admin_notes: "موافقة",
-            created_at: "2023-06-15",
-            updated_at: "2023-06-20"
-          },
-          {
-            id: "2",
-            national_id: "B789012",
-            travel_type: "خارج الوطن",
-            country: "المملكة العربية السعودية",
-            start_date: "2023-08-05",
-            end_date: "2023-08-15",
-            days_count: 11,
-            reason: "سفر للعمرة",
-            status: "pending",
-            created_at: "2023-07-20",
-            updated_at: "2023-07-20"
-          },
-          {
-            id: "3",
-            national_id: "C345678",
-            travel_type: "داخل الوطن",
-            start_date: "2023-09-01",
-            end_date: "2023-09-05",
-            days_count: 5,
-            reason: "ظروف خاصة",
-            status: "rejected",
-            admin_notes: "تجاوز الحد المسموح",
-            created_at: "2023-08-15",
-            updated_at: "2023-08-18"
-          }
-        ]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLeaveRequests();
-  }, []);
-
-  // Function to handle deleting a leave request
-  const deleteRequest = async (id: string) => {
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    
+    if (!nationalId) {
+      setError("الرجاء إدخال رقم البطاقة الوطنية");
+      return;
+    }
+    
     try {
-      setDeleteLoading(true);
+      setLoading(true);
+      setError("");
       
-      const { error } = await supabase
-        .from(TABLES.LEAVE_REQUESTS)
-        .delete()
-        .eq('id', id);
+      // Search for staff in Supabase
+      const { data, error } = await supabase
+        .from(TABLES.STAFF)
+        .select('*')
+        .eq('national_id', nationalId)
+        .single();
       
       if (error) {
-        if (error.code === "42501") {
-          // Permission denied error (RLS policy restriction)
-          toast.error("لا يمكن حذف هذا الطلب. قد يكون تمت الموافقة عليه بالفعل أو ليس لديك الصلاحيات المطلوبة.");
-        } else {
-          console.error('Error deleting leave request:', error);
-          toast.error("حدث خطأ أثناء محاولة حذف الطلب. يرجى المحاولة مرة أخرى.");
-        }
+        console.error('Error searching for staff:', error);
+        setError("لم يتم العثور على سجل لهذا الرقم");
+        setSearchPerformed(false);
+        setStaffName("");
         return;
       }
       
-      // Update local state after successful deletion
-      setRequests(prevRequests => prevRequests.filter(request => request.id !== id));
-      toast.success("تم حذف طلب الإجازة بنجاح");
+      if (data) {
+        setSearchPerformed(true);
+        setStaffName(data.full_name);
+        toast.success("تم العثور على بيانات الموظف بنجاح");
+      } else {
+        setError("لم يتم العثور على سجل لهذا الرقم");
+        setSearchPerformed(false);
+        setStaffName("");
+      }
     } catch (err) {
-      console.error('Error deleting leave request:', err);
-      toast.error("حدث خطأ أثناء محاولة حذف الطلب. يرجى المحاولة مرة أخرى.");
+      console.error('Error during staff search:', err);
+      setError("حدث خطأ أثناء البحث. الرجاء المحاولة مرة أخرى.");
+      setSearchPerformed(false);
     } finally {
-      setDeleteLoading(false);
-      setRequestToDelete(null);
+      setLoading(false);
     }
   };
 
-  // Filter requests based on status and search term
-  const filteredRequests = requests.filter(request => {
-    // Filter by status
-    if (filter !== "all" && request.status !== filter) return false;
-    
-    // Filter by search term
-    if (searchTerm && !request.national_id.includes(searchTerm)) return false;
-    
-    return true;
-  });
-
-  // Format date for display
-  function formatDate(dateString: string) {
+  const handlePrint = async (documentId: number) => {
     try {
-      const date = new Date(dateString);
-      return format(date, "PPP", { locale: ar });
-    } catch (error) {
-      return dateString;
+      setPrintLoading(documentId);
+      
+      // Log document request in Supabase
+      const { error } = await supabase
+        .from(TABLES.DOCUMENT_REQUESTS)
+        .insert([{
+          national_id: nationalId,
+          document_type: documents.find(d => d.id === documentId)?.title || "",
+          status: "printed"
+        }]);
+      
+      if (error) {
+        console.error('Error logging document print:', error);
+        toast.error("حدث خطأ أثناء طلب المستند");
+        return;
+      }
+      
+      // Simulate document generation
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Generate document content based on document type and staff info
+      let documentContent = "";
+      const docType = documents.find(d => d.id === documentId)?.title;
+      const currentDate = new Date().toLocaleDateString('ar-SA');
+      
+      if (docType === "شهادة عمل") {
+        documentContent = `
+          <div dir="rtl" style="font-family: Arial, sans-serif; padding: 40px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #1a1a1a;">شهادة عمل</h1>
+              <p>وزارة الأوقاف والشؤون الإسلامية</p>
+            </div>
+            
+            <p>تشهد وزارة الأوقاف والشؤون الإسلامية بأن السيد ${staffName} يعمل لديها بصفة موظف ديني.</p>
+            
+            <p>رقم البطاقة الوطنية: ${nationalId}</p>
+            <p>منذ تاريخ: 01/01/2020</p>
+            
+            <p>حررت هذه الشهادة بناءً على طلب المعني بالأمر للإدلاء بها عند الحاجة.</p>
+            
+            <div style="margin-top: 50px; text-align: left;">
+              <p>حرر بتاريخ: ${currentDate}</p>
+              <p>توقيع المسؤول:</p>
+              <div style="margin-top: 15px; border-bottom: 1px solid #000; width: 200px;"></div>
+            </div>
+          </div>
+        `;
+      } else if (docType === "إشعار إجازة") {
+        documentContent = `
+          <div dir="rtl" style="font-family: Arial, sans-serif; padding: 40px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #1a1a1a;">إشعار إجازة</h1>
+              <p>وزارة الأوقاف والشؤون الإسلامية</p>
+            </div>
+            
+            <p>هذه الوثيقة تشهد بأن السيد ${staffName} قد تمت الموافقة على إجازته.</p>
+            
+            <p>رقم البطاقة الوطنية: ${nationalId}</p>
+            <p>فترة الإجازة: من تاريخ __/__/____ إلى تاريخ __/__/____</p>
+            <p>عدد أيام الإجازة: ___</p>
+            
+            <div style="margin-top: 50px; text-align: left;">
+              <p>حرر بتاريخ: ${currentDate}</p>
+              <p>توقيع المسؤول:</p>
+              <div style="margin-top: 15px; border-bottom: 1px solid #000; width: 200px;"></div>
+            </div>
+          </div>
+        `;
+      } else if (docType === "مذكرة استئناف عمل") {
+        documentContent = `
+          <div dir="rtl" style="font-family: Arial, sans-serif; padding: 40px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #1a1a1a;">مذكرة استئناف عمل</h1>
+              <p>وزارة الأوقاف والشؤون الإسلامية</p>
+            </div>
+            
+            <p>نشهد بأن السيد ${staffName} قد استأنف عمله بعد انتهاء إجازته.</p>
+            
+            <p>رقم البطاقة الوطنية: ${nationalId}</p>
+            <p>تاريخ استئناف العمل: ${currentDate}</p>
+            
+            <div style="margin-top: 50px; text-align: left;">
+              <p>حرر بتاريخ: ${currentDate}</p>
+              <p>توقيع المسؤول:</p>
+              <div style="margin-top: 15px; border-bottom: 1px solid #000; width: 200px;"></div>
+            </div>
+          </div>
+        `;
+      }
+      
+      // Print document
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>${docType} - ${staffName}</title>
+              <style>
+                @media print {
+                  body { margin: 0; }
+                }
+              </style>
+            </head>
+            <body>
+              ${documentContent}
+              <script>
+                window.onload = function() {
+                  window.print();
+                  setTimeout(function() { window.close(); }, 500);
+                }
+              </script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
+      
+      toast.success("تم إنشاء المستند بنجاح");
+    } catch (err) {
+      console.error('Error generating document:', err);
+      toast.error("حدث خطأ أثناء إنشاء المستند");
+    } finally {
+      setPrintLoading(null);
     }
-  }
-
-  // Get status badge
-  function getStatusBadge(status: string) {
-    switch (status) {
-      case "approved":
-        return <Badge className="bg-green-500">تمت الموافقة</Badge>;
-      case "rejected":
-        return <Badge variant="destructive">مرفوض</Badge>;
-      case "pending":
-        return <Badge variant="outline">قيد المراجعة</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  }
-
-  // View request details
-  const viewRequestDetails = (request: LeaveRequest) => {
-    setRequestToView(request);
   };
 
   return (
     <MainLayout>
       <div className="space-y-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">سجل الطلبات</h2>
+          <h2 className="text-3xl font-bold tracking-tight">طباعة الوثائق</h2>
           <p className="text-muted-foreground">
-            عرض وتتبع جميع طلبات الإجازة السابقة
+            طباعة الوثائق والشهادات الرسمية
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>الطلبات السابقة</CardTitle>
+            <CardTitle>طلب وثيقة</CardTitle>
             <CardDescription>
-              يمكنك البحث وتصفية الطلبات حسب الحالة
+              أدخل رقم البطاقة الوطنية للموظف للبحث عن الوثائق المتاحة
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col md:flex-row gap-4 mb-6">
-              <div className="w-full md:w-1/3">
-                <Input
-                  placeholder="البحث برقم البطاقة الوطنية..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <div className="w-full md:w-1/3">
-                <Select
-                  value={filter}
-                  onValueChange={setFilter}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="flex flex-col md:flex-row gap-4 items-end">
+                <div className="flex-1">
+                  <label htmlFor="national_id" className="block text-sm font-medium mb-2">
+                    رقم البطاقة الوطنية
+                  </label>
+                  <Input
+                    id="national_id"
+                    value={nationalId}
+                    onChange={(e) => setNationalId(e.target.value)}
+                    placeholder="أدخل رقم البطاقة الوطنية"
+                  />
+                </div>
+                <Button 
+                  type="submit"
+                  disabled={loading}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="تصفية حسب الحالة" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">جميع الطلبات</SelectItem>
-                    <SelectItem value="pending">قيد المراجعة</SelectItem>
-                    <SelectItem value="approved">تمت الموافقة</SelectItem>
-                    <SelectItem value="rejected">مرفوض</SelectItem>
-                  </SelectContent>
-                </Select>
+                  {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : "بحث"}
+                </Button>
               </div>
-            </div>
-
+              
+              {error && <p className="text-destructive text-sm">{error}</p>}
+            </form>
+            
             {loading ? (
-              <div className="space-y-2">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
+              <div className="mt-8 space-y-4">
+                <h3 className="text-lg font-medium mb-4">جاري البحث...</h3>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-48 w-full" />
+                  ))}
+                </div>
               </div>
-            ) : error ? (
-              <div className="p-4 bg-red-50 text-red-700 rounded-md">
-                {error}
+            ) : searchPerformed && (
+              <div className="mt-8">
+                <h3 className="text-lg font-medium mb-1">الوثائق المتاحة للطباعة</h3>
+                <p className="text-sm text-muted-foreground mb-4">للموظف: {staffName}</p>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {documents.map((doc) => (
+                    <Card key={doc.id}>
+                      <CardContent className="p-5">
+                        <div className="flex justify-center mb-4">
+                          <FileText className="h-10 w-10 text-primary" />
+                        </div>
+                        <h4 className="font-medium text-center mb-2">{doc.title}</h4>
+                        <p className="text-sm text-muted-foreground text-center mb-4">
+                          {doc.description}
+                        </p>
+                        <Button 
+                          onClick={() => handlePrint(doc.id)} 
+                          className="w-full"
+                          variant="outline"
+                          disabled={printLoading === doc.id}
+                        >
+                          {printLoading === doc.id ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Printer className="h-4 w-4 mr-2" />
+                          )}
+                          طباعة
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               </div>
-            ) : (
-              <Table>
-                <TableCaption>قائمة بجميع طلبات الإجازة السابقة.</TableCaption>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>رقم الطلب</TableHead>
-                    <TableHead>رقم البطاقة</TableHead>
-                    <TableHead>نوع السفر</TableHead>
-                    <TableHead>من تاريخ</TableHead>
-                    <TableHead>إلى تاريخ</TableHead>
-                    <TableHead>الأيام</TableHead>
-                    <TableHead>حالة الطلب</TableHead>
-                    <TableHead>تاريخ الطلب</TableHead>
-                    <TableHead>الإجراءات</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredRequests.length > 0 ? (
-                    filteredRequests.map((request) => (
-                      <TableRow key={request.id}>
-                        <TableCell>{request.id}</TableCell>
-                        <TableCell>{request.national_id}</TableCell>
-                        <TableCell>{request.travel_type}</TableCell>
-                        <TableCell>{formatDate(request.start_date)}</TableCell>
-                        <TableCell>{formatDate(request.end_date)}</TableCell>
-                        <TableCell>{request.days_count}</TableCell>
-                        <TableCell>{getStatusBadge(request.status)}</TableCell>
-                        <TableCell>{formatDate(request.created_at)}</TableCell>
-                        <TableCell className="flex gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => viewRequestDetails(request)}
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                          
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                                disabled={request.status !== "pending"} // Only allow deleting pending requests
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent className="rtl">
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  هل أنت متأكد من رغبتك في حذف طلب الإجازة هذا؟ لا يمكن التراجع عن هذا الإجراء.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                <AlertDialogAction 
-                                  onClick={() => deleteRequest(request.id)}
-                                  className="bg-red-600 hover:bg-red-700"
-                                  disabled={deleteLoading}
-                                >
-                                  {deleteLoading ? (
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                  ) : "حذف"}
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={9} className="text-center py-10">
-                        لا توجد طلبات متطابقة مع معايير البحث
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
             )}
           </CardContent>
         </Card>
-        
-        {/* Request Details Dialog */}
-        {requestToView && (
-          <Dialog open={!!requestToView} onOpenChange={(open) => !open && setRequestToView(null)}>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>تفاصيل طلب الإجازة #{requestToView.id}</DialogTitle>
-                <DialogDescription>
-                  معلومات تفصيلية عن الطلب
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="grid gap-4">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">رقم البطاقة</p>
-                    <p>{requestToView.national_id}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">نوع السفر</p>
-                    <p>{requestToView.travel_type}</p>
-                  </div>
-                </div>
-                
-                {requestToView.travel_type === "خارج الوطن" && requestToView.country && (
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">الدولة</p>
-                    <p>{requestToView.country}</p>
-                  </div>
-                )}
-                
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">من تاريخ</p>
-                    <p>{formatDate(requestToView.start_date)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">إلى تاريخ</p>
-                    <p>{formatDate(requestToView.end_date)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">عدد الأيام</p>
-                    <p>{requestToView.days_count}</p>
-                  </div>
-                </div>
-                
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">سبب الإجازة</p>
-                  <p className="p-3 bg-muted rounded-md">{requestToView.reason}</p>
-                </div>
-                
-                {requestToView.admin_notes && (
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">ملاحظات الإدارة</p>
-                    <p className="p-3 bg-muted rounded-md">{requestToView.admin_notes}</p>
-                  </div>
-                )}
-                
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">حالة الطلب</p>
-                  <div>{getStatusBadge(requestToView.status)}</div>
-                </div>
-              </div>
-              
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setRequestToView(null)}>
-                  إغلاق
-                </Button>
-                {requestToView.status === "pending" && (
-                  <Button 
-                    variant="destructive"
-                    onClick={() => {
-                      setRequestToView(null);
-                      deleteRequest(requestToView.id);
-                    }}
-                  >
-                    حذف الطلب
-                  </Button>
-                )}
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
       </div>
     </MainLayout>
   );
