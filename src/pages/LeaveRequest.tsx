@@ -12,11 +12,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { LeaveRequestFormData, RoleType } from "@/lib/types";
+import { LeaveRequestFormData, RoleType, Staff } from "@/lib/types";
+import { supabase, TABLES } from "@/lib/supabase";
+import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 const roleEnum = z.enum(["خطيب", "إمام", "مؤذن"]);
 
@@ -49,10 +52,13 @@ const formSchema = z.object({
 });
 
 export default function LeaveRequest() {
+  const navigate = useNavigate();
   const [daysCount, setDaysCount] = useState(0);
-  const [previousDays, setPreviousDays] = useState(0); // This would come from real data
+  const [previousDays, setPreviousDays] = useState(0);
   const [exceedsLimit, setExceedsLimit] = useState(false);
   const [selectedRoles, setSelectedRoles] = useState<RoleType[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
   
   const availableRoles: { id: RoleType; label: string }[] = [
     { id: "خطيب", label: "خطيب" },
@@ -119,33 +125,153 @@ export default function LeaveRequest() {
   };
 
   // Calculate days when dates change
-  useState(() => {
+  useEffect(() => {
     if (watchStartDate && watchEndDate) {
       const days = differenceInDays(watchEndDate, watchStartDate) + 1;
       setDaysCount(days);
       
       // Check if total days exceed limit
       const totalDays = days + previousDays;
-      setExceedsLimit(totalDays > 15);
+      setExceedsLimit(totalDays > 20);
     }
-  });
+  }, [watchStartDate, watchEndDate, previousDays]);
 
-  // This would be connected to real data once Supabase is properly connected
+  // Fetch staff data from Supabase based on national_id
   const handleSearchStaff = async (national_id: string) => {
-    // Simulated staff lookup for now
-    if (national_id === "A123456") {
-      form.setValue("full_name", "محمد عبد الرحمن");
-      form.setValue("phone_number", "0612345678");
-      form.setValue("roles", ["إمام"]); // Set default role as an array
-      form.setValue("mosque_name", "مسجد الحسن الثاني");
-      setPreviousDays(10); // Simulated previous leave days
+    if (!national_id) {
+      toast.error("الرجاء إدخال رقم البطاقة الوطنية");
+      return;
+    }
+    
+    try {
+      setSearchLoading(true);
+      const { data, error } = await supabase
+        .from(TABLES.STAFF)
+        .select('*')
+        .eq('national_id', national_id)
+        .single();
+      
+      if (error) {
+        console.error('Error searching for staff:', error);
+        toast.error("لم يتم العثور على سجل بهذا الرقم");
+        return;
+      }
+      
+      if (data) {
+        // Populate form with staff data
+        form.setValue("full_name", data.full_name);
+        form.setValue("phone_number", data.phone_number);
+        
+        // Set roles
+        if (data.role) {
+          try {
+            // Check if role is stored as an array, a string, or needs to be parsed
+            let roles: RoleType[] = [];
+            if (typeof data.role === 'string') {
+              try {
+                const parsedRoles = JSON.parse(data.role);
+                roles = Array.isArray(parsedRoles) ? parsedRoles : [data.role as RoleType];
+              } catch (e) {
+                roles = [data.role as RoleType];
+              }
+            } else if (Array.isArray(data.role)) {
+              roles = data.role as RoleType[];
+            }
+            
+            form.setValue("roles", roles);
+          } catch (e) {
+            console.error('Error parsing roles:', e);
+            form.setValue("roles", []);
+          }
+        }
+        
+        form.setValue("mosque_name", data.mosque_name);
+        
+        // Fetch previous leave days for the current year
+        const currentYear = new Date().getFullYear();
+        const { data: leaveData, error: leaveError } = await supabase
+          .from(TABLES.LEAVE_REQUESTS)
+          .select('days_count')
+          .eq('national_id', national_id)
+          .eq('status', 'approved')
+          .gte('start_date', `${currentYear}-01-01`)
+          .lte('end_date', `${currentYear}-12-31`);
+        
+        if (leaveError) {
+          console.error('Error fetching leave history:', leaveError);
+        } else if (leaveData) {
+          const totalPreviousDays = leaveData.reduce((sum, item) => sum + item.days_count, 0);
+          setPreviousDays(totalPreviousDays);
+        }
+        
+        toast.success("تم العثور على بيانات الموظف بنجاح");
+      }
+    } catch (err) {
+      console.error('Error during staff search:', err);
+      toast.error("حدث خطأ أثناء البحث عن بيانات الموظف");
+    } finally {
+      setSearchLoading(false);
     }
   };
 
   async function onSubmit(values: LeaveRequestFormData) {
-    // This would connect to Supabase once properly configured
-    console.log(values);
-    alert("تم تقديم الطلب بنجاح!");
+    try {
+      setLoading(true);
+      
+      if (exceedsLimit) {
+        toast.error("مجموع أيام الإجازة يتجاوز الحد المسموح به (20 يومًا)");
+        return;
+      }
+      
+      // Calculate days count
+      const days = differenceInDays(values.end_date, values.start_date) + 1;
+      
+      // Format dates for database
+      const startDate = format(values.start_date, "yyyy-MM-dd");
+      const endDate = format(values.end_date, "yyyy-MM-dd");
+      
+      // Prepare data for insertion
+      const leaveRequestData = {
+        national_id: values.national_id,
+        full_name: values.full_name,
+        phone_number: values.phone_number,
+        roles: values.roles,
+        deputies: values.deputies,
+        mosque_name: values.mosque_name,
+        travel_type: values.travel_type,
+        country: values.country,
+        start_date: startDate,
+        end_date: endDate,
+        days_count: days,
+        reason: values.reason,
+        status: "pending",
+      };
+      
+      // Insert into Supabase
+      const { data, error } = await supabase
+        .from(TABLES.LEAVE_REQUESTS)
+        .insert([leaveRequestData])
+        .select();
+      
+      if (error) {
+        console.error('Error submitting leave request:', error);
+        toast.error("حدث خطأ أثناء تقديم الطلب. الرجاء المحاولة مرة أخرى.");
+        return;
+      }
+      
+      toast.success("تم تقديم طلب الإجازة بنجاح!");
+      
+      // Reset form
+      form.reset();
+      
+      // Navigate to history page
+      navigate('/history');
+    } catch (err) {
+      console.error('Error submitting form:', err);
+      toast.error("حدث خطأ غير متوقع. الرجاء المحاولة مرة أخرى.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -194,8 +320,11 @@ export default function LeaveRequest() {
                         variant="outline"
                         className="mb-2"
                         onClick={() => handleSearchStaff(form.getValues("national_id"))}
+                        disabled={searchLoading}
                       >
-                        بحث
+                        {searchLoading ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : "بحث"}
                       </Button>
                     </div>
 
@@ -471,15 +600,18 @@ export default function LeaveRequest() {
                       <AlertCircle className="h-4 w-4" />
                       <AlertTitle>تنبيه</AlertTitle>
                       <AlertDescription>
-                        مجموع أيام الإجازة يتجاوز الحد المسموح به (15 يومًا). يرجى مراجعة طلبك.
+                        مجموع أيام الإجازة يتجاوز الحد المسموح به (20 يومًا). يرجى مراجعة طلبك.
                       </AlertDescription>
                     </Alert>
                   )}
                 </div>
 
                 <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline">إلغاء</Button>
-                  <Button type="submit">تقديم الطلب</Button>
+                  <Button type="button" variant="outline" onClick={() => form.reset()}>إلغاء</Button>
+                  <Button type="submit" disabled={loading || exceedsLimit}>
+                    {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    تقديم الطلب
+                  </Button>
                 </div>
               </form>
             </Form>
