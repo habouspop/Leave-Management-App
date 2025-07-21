@@ -20,16 +20,20 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
-import { Trash2 } from "lucide-react";
+import { Trash2, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase, TABLES } from "@/lib/supabase";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function History() {
   const [filter, setFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [requestToDelete, setRequestToDelete] = useState<string | null>(null);
+  const [requestToView, setRequestToView] = useState<LeaveRequest | null>(null);
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch leave requests from Supabase
@@ -54,6 +58,7 @@ export default function History() {
             id: item.id,
             national_id: item.national_id,
             travel_type: item.travel_type,
+            country: item.country,
             start_date: item.start_date,
             end_date: item.end_date,
             days_count: item.days_count,
@@ -70,8 +75,48 @@ export default function History() {
         setError('حدث خطأ أثناء جلب البيانات. الرجاء المحاولة مرة أخرى.');
         
         // Fallback to mock data if there's an error
-       
-       } finally {
+        setRequests([
+          {
+            id: "1",
+            national_id: "A123456",
+            travel_type: "داخل الوطن",
+            start_date: "2023-07-10",
+            end_date: "2023-07-15",
+            days_count: 6,
+            reason: "زيارة عائلية",
+            status: "approved",
+            admin_notes: "موافقة",
+            created_at: "2023-06-15",
+            updated_at: "2023-06-20"
+          },
+          {
+            id: "2",
+            national_id: "B789012",
+            travel_type: "خارج الوطن",
+            country: "المملكة العربية السعودية",
+            start_date: "2023-08-05",
+            end_date: "2023-08-15",
+            days_count: 11,
+            reason: "سفر للعمرة",
+            status: "pending",
+            created_at: "2023-07-20",
+            updated_at: "2023-07-20"
+          },
+          {
+            id: "3",
+            national_id: "C345678",
+            travel_type: "داخل الوطن",
+            start_date: "2023-09-01",
+            end_date: "2023-09-05",
+            days_count: 5,
+            reason: "ظروف خاصة",
+            status: "rejected",
+            admin_notes: "تجاوز الحد المسموح",
+            created_at: "2023-08-15",
+            updated_at: "2023-08-18"
+          }
+        ]);
+      } finally {
         setLoading(false);
       }
     };
@@ -82,6 +127,8 @@ export default function History() {
   // Function to handle deleting a leave request
   const deleteRequest = async (id: string) => {
     try {
+      setDeleteLoading(true);
+      
       const { error } = await supabase
         .from(TABLES.LEAVE_REQUESTS)
         .delete()
@@ -105,10 +152,12 @@ export default function History() {
       console.error('Error deleting leave request:', err);
       toast.error("حدث خطأ أثناء محاولة حذف الطلب. يرجى المحاولة مرة أخرى.");
     } finally {
+      setDeleteLoading(false);
       setRequestToDelete(null);
     }
   };
 
+  // Filter requests based on status and search term
   const filteredRequests = requests.filter(request => {
     // Filter by status
     if (filter !== "all" && request.status !== filter) return false;
@@ -119,11 +168,17 @@ export default function History() {
     return true;
   });
 
+  // Format date for display
   function formatDate(dateString: string) {
-    const date = new Date(dateString);
-    return format(date, "PPP", { locale: ar });
+    try {
+      const date = new Date(dateString);
+      return format(date, "PPP", { locale: ar });
+    } catch (error) {
+      return dateString;
+    }
   }
 
+  // Get status badge
   function getStatusBadge(status: string) {
     switch (status) {
       case "approved":
@@ -136,6 +191,11 @@ export default function History() {
         return <Badge variant="secondary">{status}</Badge>;
     }
   }
+
+  // View request details
+  const viewRequestDetails = (request: LeaveRequest) => {
+    setRequestToView(request);
+  };
 
   return (
     <MainLayout>
@@ -181,73 +241,183 @@ export default function History() {
               </div>
             </div>
 
-            <Table>
-              <TableCaption>قائمة بجميع طلبات الإجازة السابقة.</TableCaption>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>رقم الطلب</TableHead>
-                  <TableHead>رقم البطاقة</TableHead>
-                  <TableHead>نوع السفر</TableHead>
-                  <TableHead>من تاريخ</TableHead>
-                  <TableHead>إلى تاريخ</TableHead>
-                  <TableHead>الأيام</TableHead>
-                  <TableHead>حالة الطلب</TableHead>
-                  <TableHead>تاريخ الطلب</TableHead>
-                  <TableHead>الإجراءات</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRequests.length > 0 ? (
-                  filteredRequests.map((request) => (
-                    <TableRow key={request.id}>
-                      <TableCell>{request.id}</TableCell>
-                      <TableCell>{request.national_id}</TableCell>
-                      <TableCell>{request.travel_type}</TableCell>
-                      <TableCell>{formatDate(request.start_date)}</TableCell>
-                      <TableCell>{formatDate(request.end_date)}</TableCell>
-                      <TableCell>{request.days_count}</TableCell>
-                      <TableCell>{getStatusBadge(request.status)}</TableCell>
-                      <TableCell>{formatDate(request.created_at)}</TableCell>
-                      <TableCell className="flex gap-2">
-                        <Button variant="ghost" size="sm">التفاصيل</Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700 hover:bg-red-50">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent className="rtl">
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                هل أنت متأكد من رغبتك في حذف طلب الإجازة هذا؟ لا يمكن التراجع عن هذا الإجراء.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                              <AlertDialogAction 
-                                onClick={() => deleteRequest(request.id)}
-                                className="bg-red-600 hover:bg-red-700"
+            {loading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : error ? (
+              <div className="p-4 bg-red-50 text-red-700 rounded-md">
+                {error}
+              </div>
+            ) : (
+              <Table>
+                <TableCaption>قائمة بجميع طلبات الإجازة السابقة.</TableCaption>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>رقم الطلب</TableHead>
+                    <TableHead>رقم البطاقة</TableHead>
+                    <TableHead>نوع السفر</TableHead>
+                    <TableHead>من تاريخ</TableHead>
+                    <TableHead>إلى تاريخ</TableHead>
+                    <TableHead>الأيام</TableHead>
+                    <TableHead>حالة الطلب</TableHead>
+                    <TableHead>تاريخ الطلب</TableHead>
+                    <TableHead>الإجراءات</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredRequests.length > 0 ? (
+                    filteredRequests.map((request) => (
+                      <TableRow key={request.id}>
+                        <TableCell>{request.id}</TableCell>
+                        <TableCell>{request.national_id}</TableCell>
+                        <TableCell>{request.travel_type}</TableCell>
+                        <TableCell>{formatDate(request.start_date)}</TableCell>
+                        <TableCell>{formatDate(request.end_date)}</TableCell>
+                        <TableCell>{request.days_count}</TableCell>
+                        <TableCell>{getStatusBadge(request.status)}</TableCell>
+                        <TableCell>{formatDate(request.created_at)}</TableCell>
+                        <TableCell className="flex gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => viewRequestDetails(request)}
+                          >
+                            <FileText className="h-4 w-4" />
+                          </Button>
+                          
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                disabled={request.status !== "pending"} // Only allow deleting pending requests
                               >
-                                حذف
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="rtl">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  هل أنت متأكد من رغبتك في حذف طلب الإجازة هذا؟ لا يمكن التراجع عن هذا الإجراء.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={() => deleteRequest(request.id)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                  disabled={deleteLoading}
+                                >
+                                  {deleteLoading ? (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  ) : "حذف"}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-10">
+                        لا توجد طلبات متطابقة مع معايير البحث
                       </TableCell>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-10">
-                      لا توجد طلبات متطابقة مع معايير البحث
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
+        
+        {/* Request Details Dialog */}
+        {requestToView && (
+          <Dialog open={!!requestToView} onOpenChange={(open) => !open && setRequestToView(null)}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>تفاصيل طلب الإجازة #{requestToView.id}</DialogTitle>
+                <DialogDescription>
+                  معلومات تفصيلية عن الطلب
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="grid gap-4">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">رقم البطاقة</p>
+                    <p>{requestToView.national_id}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">نوع السفر</p>
+                    <p>{requestToView.travel_type}</p>
+                  </div>
+                </div>
+                
+                {requestToView.travel_type === "خارج الوطن" && requestToView.country && (
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">الدولة</p>
+                    <p>{requestToView.country}</p>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">من تاريخ</p>
+                    <p>{formatDate(requestToView.start_date)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">إلى تاريخ</p>
+                    <p>{formatDate(requestToView.end_date)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">عدد الأيام</p>
+                    <p>{requestToView.days_count}</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">سبب الإجازة</p>
+                  <p className="p-3 bg-muted rounded-md">{requestToView.reason}</p>
+                </div>
+                
+                {requestToView.admin_notes && (
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">ملاحظات الإدارة</p>
+                    <p className="p-3 bg-muted rounded-md">{requestToView.admin_notes}</p>
+                  </div>
+                )}
+                
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">حالة الطلب</p>
+                  <div>{getStatusBadge(requestToView.status)}</div>
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setRequestToView(null)}>
+                  إغلاق
+                </Button>
+                {requestToView.status === "pending" && (
+                  <Button 
+                    variant="destructive"
+                    onClick={() => {
+                      setRequestToView(null);
+                      deleteRequest(requestToView.id);
+                    }}
+                  >
+                    حذف الطلب
+                  </Button>
+                )}
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     </MainLayout>
   );
