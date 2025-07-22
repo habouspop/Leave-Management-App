@@ -9,6 +9,9 @@ import History from './pages/History';
 import Print from './pages/Print';
 import Admin from './pages/Admin';
 import NotFound from './pages/NotFound';
+import AddStaff from "./pages/AddStaff";
+
+<Route path="/add-staff" element={<AddStaff />} />
 
 const queryClient = new QueryClient();
 
