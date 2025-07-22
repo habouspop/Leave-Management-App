@@ -10,6 +10,7 @@ import Print from './pages/Print';
 import Admin from './pages/Admin';
 import NotFound from './pages/NotFound';
 import AddStaff from "./pages/AddStaff";
+import SignUp from "./pages/SignUp";
 
 
 
@@ -22,6 +23,7 @@ const App = () => (
         <Toaster />
         <BrowserRouter>
           <Routes>
+            <Route path="/signup" element={<SignUp />} />
             <Route path="/" element={<Dashboard />} />
             <Route path="/leave-request" element={<LeaveRequest />} />
             <Route path="/history" element={<History />} />
