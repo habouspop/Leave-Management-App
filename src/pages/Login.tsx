@@ -65,15 +65,6 @@ export default function Login() {
               {loading ? "جاري تسجيل الدخول..." : "تسجيل الدخول"}
             </Button>
           </form>
-          <p className="mt-4 text-center text-sm">
-            لا تملك حساب؟{" "}
-            <button
-              onClick={() => navigate("/signup")}
-              className="text-blue-600 hover:underline"
-            >
-              إنشاء حساب
-            </button>
-          </p>
         </CardContent>
       </Card>
     </div>
