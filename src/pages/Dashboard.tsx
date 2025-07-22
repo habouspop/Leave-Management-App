@@ -13,6 +13,24 @@ export default function Dashboard() {
     </div>
   );
 }
+
+import { supabase } from "@/lib/supabase";
+import { useNavigate } from "react-router-dom";
+
+function LogoutButton() {
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/login");
+  };
+
+  return (
+    <button onClick={handleLogout}>تسجيل الخروج</button>
+  );
+}
+
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MainLayout } from "@/components/layout/main-layout";
