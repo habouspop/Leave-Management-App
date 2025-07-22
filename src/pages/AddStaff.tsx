@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { supabase } from "@/lib/supabase";
+import { supabase, TABLES } from "@/lib/supabase";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Loader2 } from "lucide-react";
 
