@@ -1,164 +1,96 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
-import { toast } from "sonner";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { supabase, TABLES } from "@/lib/supabase";
-import { MainLayout } from "@/components/layout/main-layout";
-import { Loader2 } from "lucide-react";
-
-const staffFormSchema = z.object({
-  national_id: z.string().min(5, "رقم البطاقة الوطنية مطلوب"),
-  full_name: z.string().min(2, "الاسم الكامل مطلوب"),
-  phone_number: z.string().min(10, "رقم الهاتف غير صحيح"),
-  role: z.string().min(2, "المهمة مطلوبة"),
-  mosque_name: z.string().min(1, "اسم المسجد مطلوب"),
-});
-
-type StaffFormValues = z.infer<typeof staffFormSchema>;
+import { v4 as uuidv4 } from "uuid";
+import { toast } from "sonner";
 
 export default function AddStaff() {
+  const [nationalId, setNationalId] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [role, setRole] = useState("");
+  const [mosqueName, setMosqueName] = useState("");
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
-  const form = useForm<StaffFormValues>({
-    resolver: zodResolver(staffFormSchema),
-    defaultValues: {
-      national_id: "",
-      full_name: "",
-      phone_number: "",
-      role: "",
-      mosque_name: "",
-    },
-  });
 
-  const onSubmit = async (values: StaffFormValues) => {
-    setLoading(true);
-
-    // الحصول على user الحالي
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      toast.error("تعذر الحصول على معلومات المستخدم.");
-      setLoading(false);
+  const handleSubmit = async () => {
+    if (!nationalId || !fullName || !phoneNumber || !role || !mosqueName) {
+      toast.error("يرجى ملء جميع الحقول");
       return;
     }
 
-    // إعداد البيانات للإرسال
-    const newStaff = {
-      ...values,
-      user_id: user.id,
-    };
+    setLoading(true);
 
-    // إدراج في قاعدة البيانات
-    const { error } = await supabase.from("app_898addec89d545269726d3424da4f59d_staff").insert(newStaff);
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.STAFF)
+        .insert([
+          {
+            id: uuidv4(),
+            national_id: nationalId,
+            full_name: fullName,
+            phone_number: phoneNumber,
+            role,
+            mosque_name: mosqueName,
+            user_id: null, // أو عوض null ب uuidv4() لو كان لازم
+          },
+        ]);
 
-    if (error) {
-      if (error.code === "23505") {
-        toast.error("رقم البطاقة الوطنية مستخدم بالفعل.");
+      if (error) {
+        toast.error("خطأ في الإضافة: " + error.message);
       } else {
-        console.error("Insert error:", error);
-        toast.error("حدث خطأ أثناء حفظ البيانات.");
+        toast.success("تم إضافة الموظف بنجاح");
+        setNationalId("");
+        setFullName("");
+        setPhoneNumber("");
+        setRole("");
+        setMosqueName("");
       }
-    } else {
-      toast.success("تمت إضافة الموظف بنجاح");
-      navigate("/admin");
+    } catch (e) {
+      toast.error("حدث خطأ غير متوقع");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
-    <MainLayout>
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader>
-          <CardTitle>إضافة موظف جديد</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="national_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>رقم البطاقة الوطنية</FormLabel>
-                    <FormControl>
-                      <Input placeholder="مثال: AB123456" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="full_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>الاسم الكامل</FormLabel>
-                    <FormControl>
-                      <Input placeholder="محمد بن عبد الله" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="phone_number"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>رقم الهاتف</FormLabel>
-                    <FormControl>
-                      <Input placeholder="06xxxxxxxx" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>المهمة</FormLabel>
-                    <FormControl>
-                      <Input placeholder="إمام، خطيب، مؤذن..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="mosque_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>اسم المسجد</FormLabel>
-                    <FormControl>
-                      <Input placeholder="مسجد التقوى" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="flex justify-end">
-                <Button type="submit" disabled={loading}>
-                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  حفظ الموظف
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-    </MainLayout>
+    <div className="max-w-md mx-auto p-4">
+      <h2 className="text-xl font-bold mb-4">إضافة موظف جديد</h2>
+      <input
+        placeholder="رقم البطاقة الوطنية"
+        value={nationalId}
+        onChange={(e) => setNationalId(e.target.value)}
+        className="input"
+      />
+      <input
+        placeholder="الاسم الكامل"
+        value={fullName}
+        onChange={(e) => setFullName(e.target.value)}
+        className="input"
+      />
+      <input
+        placeholder="رقم الهاتف"
+        value={phoneNumber}
+        onChange={(e) => setPhoneNumber(e.target.value)}
+        className="input"
+      />
+      <input
+        placeholder="المهمة (خطيب، إمام، مؤذن)"
+        value={role}
+        onChange={(e) => setRole(e.target.value)}
+        className="input"
+      />
+      <input
+        placeholder="المسجد المكلف به"
+        value={mosqueName}
+        onChange={(e) => setMosqueName(e.target.value)}
+        className="input"
+      />
+      <button
+        onClick={handleSubmit}
+        disabled={loading}
+        className="btn mt-4"
+      >
+        {loading ? "جارٍ الإضافة..." : "إضافة موظف"}
+      </button>
+    </div>
   );
 }
