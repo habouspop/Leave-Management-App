@@ -2,26 +2,83 @@ import { useState, useEffect } from "react";
 import { format, differenceInDays } from "date-fns";
 import { ar } from "date-fns/locale";
 import { MainLayout } from "@/components/layout/main-layout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertCircle, Loader2 } from "lucide-react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { LeaveRequestFormData, RoleType, Staff } from "@/lib/types";
+import { LeaveRequestFormData, RoleType } from "@/lib/types";
 import { supabase, TABLES } from "@/lib/supabase";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 
-// [... باقي الاستيرادات كما هي ...]
+const roleEnum = z.enum(["خطيب", "إمام", "مؤذن"]);
+
+const formSchema = z
+  .object({
+    national_id: z.string().min(5, { message: "رقم البطاقة الوطنية مطلوب" }),
+    full_name: z.string().min(2, { message: "الاسم الكامل مطلوب" }),
+    phone_number: z.string().min(10, { message: "رقم الهاتف مطلوب" }),
+    roles: z.array(roleEnum).min(1, { message: "يجب اختيار مهمة واحدة على الأقل" }),
+    deputies: z.record(z.string().optional()),
+    mosque_name: z.string().min(1, { message: "اسم المسجد مطلوب" }),
+    travel_type: z.enum(["داخل الوطن", "خارج الوطن"], { required_error: "نوع السفر مطلوب" }),
+    country: z.string().optional(),
+    start_date: z.date({ required_error: "تاريخ البداية مطلوب" }),
+    end_date: z.date({ required_error: "تاريخ النهاية مطلوب" }).refine(
+      (date) => date >= new Date(),
+      { message: "تاريخ النهاية يجب أن يكون في المستقبل" }
+    ),
+    reason: z.string().min(5, { message: "سبب الإجازة مطلوب" }),
+  })
+  .refine((data) => data.end_date >= data.start_date, {
+    message: "تاريخ النهاية يجب أن يكون بعد تاريخ البداية",
+    path: ["end_date"],
+  })
+  .refine(
+    (data) => {
+      if (data.travel_type === "خارج الوطن") {
+        return data.country?.trim().length > 0;
+      }
+      return true;
+    },
+    {
+      message: "الدولة مطلوبة عند اختيار خارج الوطن",
+      path: ["country"],
+    }
+  );
 
 export default function LeaveRequest() {
   const navigate = useNavigate();
@@ -31,7 +88,7 @@ export default function LeaveRequest() {
   const [selectedRoles, setSelectedRoles] = useState<RoleType[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
-  
+
   const availableRoles: { id: RoleType; label: string }[] = [
     { id: "خطيب", label: "خطيب" },
     { id: "إمام", label: "إمام" },
@@ -61,9 +118,7 @@ export default function LeaveRequest() {
   const watchTravelType = form.watch("travel_type");
 
   useEffect(() => {
-    if (watchTravelType === "خارج الوطن") {
-      form.register("country", { required: "الدولة مطلوبة" });
-    } else {
+    if (watchTravelType === "داخل الوطن") {
       form.setValue("country", "");
     }
   }, [watchTravelType, form]);
@@ -77,7 +132,7 @@ export default function LeaveRequest() {
     let newRoles: RoleType[];
 
     if (currentRoles.includes(role)) {
-      newRoles = currentRoles.filter(r => r !== role);
+      newRoles = currentRoles.filter((r) => r !== role);
       const currentDeputies = form.getValues("deputies") || {};
       const updatedDeputies = { ...currentDeputies };
       delete updatedDeputies[role];
@@ -108,8 +163,8 @@ export default function LeaveRequest() {
       setSearchLoading(true);
       const { data, error } = await supabase
         .from(TABLES.STAFF)
-        .select('*')
-        .eq('national_id', national_id)
+        .select("*")
+        .eq("national_id", national_id)
         .single();
 
       if (error) {
@@ -120,46 +175,41 @@ export default function LeaveRequest() {
       if (data) {
         form.setValue("full_name", data.full_name);
         form.setValue("phone_number", data.phone_number);
-
-        if (data.role) {
-          try {
-            let roles: RoleType[] = [];
-            if (typeof data.role === 'string') {
-              try {
-                const parsedRoles = JSON.parse(data.role);
-                roles = Array.isArray(parsedRoles) ? parsedRoles : [data.role as RoleType];
-              } catch {
-                roles = [data.role as RoleType];
-              }
-            } else if (Array.isArray(data.role)) {
-              roles = data.role as RoleType[];
-            }
-            form.setValue("roles", roles);
-          } catch {
-            form.setValue("roles", []);
-          }
-        }
-
         form.setValue("mosque_name", data.mosque_name);
+
+        let roles: RoleType[] = [];
+        try {
+          if (typeof data.role === "string") {
+            const parsedRoles = JSON.parse(data.role);
+            roles = Array.isArray(parsedRoles) ? parsedRoles : [data.role];
+          } else if (Array.isArray(data.role)) {
+            roles = data.role;
+          }
+        } catch {
+          roles = [data.role];
+        }
+        form.setValue("roles", roles);
 
         const currentYear = new Date().getFullYear();
         const { data: leaveData } = await supabase
           .from(TABLES.LEAVE_REQUESTS)
-          .select('days_count')
-          .eq('national_id', national_id)
-          .eq('status', 'approved')
-          .gte('start_date', `${currentYear}-01-01`)
-          .lte('end_date', `${currentYear}-12-31`);
+          .select("days_count")
+          .eq("national_id", national_id)
+          .eq("status", "approved")
+          .gte("start_date", `${currentYear}-01-01`)
+          .lte("end_date", `${currentYear}-12-31`);
 
         if (leaveData) {
-          const totalPreviousDays = leaveData.reduce((sum, item) => sum + item.days_count, 0);
+          const totalPreviousDays = leaveData.reduce(
+            (sum, item) => sum + item.days_count,
+            0
+          );
           setPreviousDays(totalPreviousDays);
         }
 
         toast.success("تم العثور على بيانات الموظف بنجاح");
       }
-    } catch (err) {
-      console.error('Error during staff search:', err);
+    } catch {
       toast.error("حدث خطأ أثناء البحث عن بيانات الموظف");
     } finally {
       setSearchLoading(false);
@@ -175,7 +225,6 @@ export default function LeaveRequest() {
         return;
       }
 
-      // ✅ جلب user_id الحالي
       const {
         data: { user },
         error: userError,
@@ -188,7 +237,6 @@ export default function LeaveRequest() {
 
       const user_id = user.id;
 
-      // 🔍 تحقق واش كاين موظف بنفس national_id
       const { data: existingStaff, error: staffError } = await supabase
         .from(TABLES.STAFF)
         .select("id, user_id")
@@ -196,7 +244,6 @@ export default function LeaveRequest() {
         .maybeSingle();
 
       if (!existingStaff && !staffError) {
-        // ➕ تسجيل الموظف الجديد
         const { error: insertStaffError } = await supabase.from(TABLES.STAFF).insert([
           {
             national_id: values.national_id,
@@ -237,9 +284,7 @@ export default function LeaveRequest() {
         status: "pending",
       };
 
-      const { error } = await supabase
-        .from(TABLES.LEAVE_REQUESTS)
-        .insert([leaveRequestData]);
+      const { error } = await supabase.from(TABLES.LEAVE_REQUESTS).insert([leaveRequestData]);
 
       if (error) {
         toast.error("حدث خطأ أثناء تقديم الطلب. الرجاء المحاولة مرة أخرى.");
@@ -249,7 +294,7 @@ export default function LeaveRequest() {
       toast.success("تم تقديم طلب الإجازة بنجاح!");
       form.reset();
       navigate("/history");
-    } catch (err) {
+    } catch {
       toast.error("حدث خطأ غير متوقع. الرجاء المحاولة مرة أخرى.");
     } finally {
       setLoading(false);
@@ -257,6 +302,8 @@ export default function LeaveRequest() {
   }
 
   return (
-    // ⬅ الواجهة كما هي بلا تغيير
+    <MainLayout>
+      {/* ... يمكن الآن إدراج الواجهة الكاملة هنا */}
+    </MainLayout>
   );
 }
