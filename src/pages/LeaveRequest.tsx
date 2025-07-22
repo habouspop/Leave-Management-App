@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { format, differenceInDays } from "date-fns";
 import { ar } from "date-fns/locale";
@@ -194,8 +195,8 @@ export default function LeaveRequest() {
           .select('days_count')
           .eq('national_id', national_id)
           .eq('status', 'approved')
-          .gte('start_date', ${currentYear}-01-01)
-          .lte('end_date', ${currentYear}-12-31);
+          .gte('start_date', `${currentYear}-01-01`)
+          .lte('end_date', `${currentYear}-12-31`);
         
         if (leaveError) {
           console.error('Error fetching leave history:', leaveError);
@@ -374,12 +375,12 @@ export default function LeaveRequest() {
                                 <div key={role.id} className="flex flex-col space-y-2">
                                   <div className="flex items-center space-x-2 space-x-reverse">
                                     <Checkbox
-                                      id={role-${role.id}}
+                                      id={`role-${role.id}`}
                                       checked={selectedRoles.includes(role.id)}
                                       onCheckedChange={() => toggleRole(role.id)}
                                     />
                                     <label
-                                      htmlFor={role-${role.id}}
+                                      htmlFor={`role-${role.id}`}
                                       className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 mr-2"
                                     >
                                       {role.label}
@@ -389,13 +390,13 @@ export default function LeaveRequest() {
                                   {selectedRoles.includes(role.id) && (
                                     <FormField
                                       control={form.control}
-                                      name={deputies.${role.id}}
+                                      name={`deputies.${role.id}`}
                                       render={({ field }) => (
                                         <FormItem>
                                           <FormLabel className="mr-6">النائب عن {role.label}</FormLabel>
                                           <FormControl>
                                             <Input
-                                              placeholder={أدخل اسم النائب عن ${role.label}}
+                                              placeholder={`أدخل اسم النائب عن ${role.label}`}
                                               {...field}
                                               value={field.value || ""}
                                             />
@@ -491,9 +492,9 @@ export default function LeaveRequest() {
                                 <FormControl>
                                   <Button
                                     variant={"outline"}
-                                    className={pl-3 text-right font-normal ${
+                                    className={`pl-3 text-right font-normal ${
                                       !field.value && "text-muted-foreground"
-                                    }}
+                                    }`}
                                   >
                                     {field.value ? (
                                       format(field.value, "PPP", { locale: ar })
@@ -529,9 +530,9 @@ export default function LeaveRequest() {
                                 <FormControl>
                                   <Button
                                     variant={"outline"}
-                                    className={pl-3 text-right font-normal ${
+                                    className={`pl-3 text-right font-normal ${
                                       !field.value && "text-muted-foreground"
-                                    }}
+                                    }`}
                                   >
                                     {field.value ? (
                                       format(field.value, "PPP", { locale: ar })
