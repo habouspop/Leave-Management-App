@@ -11,7 +11,7 @@ import Admin from './pages/Admin';
 import NotFound from './pages/NotFound';
 import AddStaff from "./pages/AddStaff";
 
-<Route path="/add-staff" element={<AddStaff />} />
+
 
 const queryClient = new QueryClient();
 
@@ -27,6 +27,7 @@ const App = () => (
             <Route path="/history" element={<History />} />
             <Route path="/print" element={<Print />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/add-staff" element={<AddStaff />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
