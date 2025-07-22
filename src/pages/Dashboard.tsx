@@ -1,3 +1,18 @@
+import { useRequireAuth } from "@/hooks/useRequireAuth";
+
+export default function Dashboard() {
+  const { loading } = useRequireAuth();
+
+  if (loading) {
+    return <div>جاري التحقق...</div>;
+  }
+
+  return (
+    <div>
+      {/* محتوى الصفحة */}
+    </div>
+  );
+}
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MainLayout } from "@/components/layout/main-layout";
