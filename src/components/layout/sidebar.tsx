@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Home, FileText, Clock, Printer, User, UserPlus } from "lucide-react"; // ✅ أضف UserPlus
+import { Home, FileText, Clock, Printer, User, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -29,9 +29,9 @@ const navItems = [
     icon: User,
   },
   {
-    title: "إضافة موظف", // ✅ العنوان الجديد
-    href: "/add-staff", // ✅ الرابط الجديد
-    icon: UserPlus,     // ✅ الأيقونة الجديدة
+    title: "إضافة موظف",
+    href: "/add-staff",
+    icon: Plus,
   },
 ];
 
@@ -64,8 +64,7 @@ export function Sidebar() {
       </nav>
 
       <div className="mt-auto pt-6 px-2 text-center text-sm text-muted-foreground">
-        المندوبية الإقليمية للشؤون الإسلامية بالحي الحسني
-        <br />
+        المندوبية الإقليمية للشؤون الإسلامية بالحي الحسني<br />
         {new Date().getFullYear()} ©
       </div>
     </aside>
