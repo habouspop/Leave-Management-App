@@ -58,7 +58,7 @@ export default function AddStaff() {
     };
 
     // إدراج في قاعدة البيانات
-    const { error } = await supabase.from("staff").insert(newStaff);
+    const { error } = await supabase.from("app_898addec89d545269726d3424da4f59d_staff").insert(newStaff);
 
     if (error) {
       if (error.code === "23505") {
