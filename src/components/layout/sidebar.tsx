@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Home, FileText, Clock, Printer, User } from "lucide-react";
+import { Home, FileText, Clock, Printer, User, UserPlus } from "lucide-react"; // ✅ أضف UserPlus
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -27,6 +27,11 @@ const navItems = [
     title: "لوحة الإدارة",
     href: "/admin",
     icon: User,
+  },
+  {
+    title: "إضافة موظف", // ✅ العنوان الجديد
+    href: "/add-staff", // ✅ الرابط الجديد
+    icon: UserPlus,     // ✅ الأيقونة الجديدة
   },
 ];
 
@@ -59,7 +64,8 @@ export function Sidebar() {
       </nav>
 
       <div className="mt-auto pt-6 px-2 text-center text-sm text-muted-foreground">
-المندوبية الإقليمية للشؤون الإسلامية بالحي الحسني        <br />
+        المندوبية الإقليمية للشؤون الإسلامية بالحي الحسني
+        <br />
         {new Date().getFullYear()} ©
       </div>
     </aside>
